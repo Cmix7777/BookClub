@@ -18,34 +18,35 @@ public class AppDbContext : DbContext
     public DbSet<PollOption> PollOptions { get; set; }
     public DbSet<Vote> Votes { get; set; }
     public DbSet<PollVoteCheck> PollVoteChecks { get; set; }
+    public DbSet<Review> Reviews { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Один пользователь — один голос в одном опросе.
-        // Защита на уровне БД, а не кода.
+        // один голос на пользователя в одном опросе
         modelBuilder.Entity<PollVoteCheck>()
             .HasIndex(pvc => new { pvc.PollId, pvc.UserId })
             .IsUnique();
 
-        // Один пользователь не может добавить одну и ту же книгу на полку дважды
+        // одна книга на полке пользователя один раз
         modelBuilder.Entity<UserBook>()
             .HasIndex(ub => new { ub.UserId, ub.BookId })
             .IsUnique();
 
-        // Один пользователь состоит в клубе только один раз
+        // пользователь состоит в клубе один раз
         modelBuilder.Entity<ClubMember>()
             .HasIndex(cm => new { cm.ClubId, cm.UserId })
             .IsUnique();
 
-        // Владелец клуба: запрещаем удалять пользователя, если у него есть клубы
+        // нельзя удалить пользователя, пока он владеет клубом
         modelBuilder.Entity<Club>()
             .HasOne(c => c.Owner)
             .WithMany()
             .HasForeignKey(c => c.OwnerId)
             .OnDelete(DeleteBehavior.Restrict);
-        
+
+        // уникальные логин и email
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Username)
             .IsUnique();
@@ -54,8 +55,18 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.Email)
             .IsUnique();
 
+        // дедлайн опроса по умолчанию — через 48 часов
         modelBuilder.Entity<Poll>()
             .Property(p => p.ClosesAt)
             .HasDefaultValueSql("now() + interval '48 hours'");
+
+        // одна рецензия пользователя на книгу
+        modelBuilder.Entity<Review>()
+            .HasIndex(r => new { r.UserId, r.BookId })
+            .IsUnique();
+
+        // оценка только от 1 до 5 — проверяет сама база
+        modelBuilder.Entity<Review>()
+            .ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
     }
 }

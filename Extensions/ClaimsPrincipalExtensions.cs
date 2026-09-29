@@ -10,4 +10,9 @@ public static class ClaimsPrincipalExtensions
         var value = user.FindFirstValue(JwtRegisteredClaimNames.Sub);
         return Guid.Parse(value!);
     }
+
+    public static string GetUsername(this ClaimsPrincipal user)
+    {
+        return user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? string.Empty;
+    }
 }
