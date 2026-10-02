@@ -75,6 +75,9 @@ public class AuthController : ControllerBase
         if (user is null || !PasswordMatches(dto.Password, user.PasswordHash))
             return Unauthorized("Неверный логин или пароль");
 
+        if (user.IsBlocked)
+            return StatusCode(403, "Аккаунт заблокирован");
+
         var (token, expiresAt) = _tokens.CreateToken(user);
 
         return new AuthResponseDto
@@ -95,7 +98,7 @@ public class AuthController : ControllerBase
         public async Task<ActionResult<MeDto>> Me()
         {
             var userId = User.GetUserId();
-
+            
             var me = await _context.Users
                 .Where(u => u.Id == userId)
                 .Select(u => new MeDto
@@ -103,7 +106,8 @@ public class AuthController : ControllerBase
                     Id = u.Id,
                     Username = u.Username,
                     Email = u.Email,
-                    CreatedAt = u.CreatedAt
+                    CreatedAt = u.CreatedAt,
+                    Role = u.Role
                 })
                 .FirstOrDefaultAsync();
 

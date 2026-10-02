@@ -68,5 +68,14 @@ public class AppDbContext : DbContext
         // оценка только от 1 до 5 — проверяет сама база
         modelBuilder.Entity<Review>()
             .ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+
+        // у существующих пользователей роль станет "User"
+        modelBuilder.Entity<User>()
+            .Property(u => u.Role)
+            .HasDefaultValue("User");
+
+        // роль — только одно из двух значений
+        modelBuilder.Entity<User>()
+            .ToTable(t => t.HasCheckConstraint("CK_Users_Role", "\"Role\" IN ('User', 'Admin')"));
     }
 }

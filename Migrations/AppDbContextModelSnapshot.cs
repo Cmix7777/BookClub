@@ -235,9 +235,18 @@ namespace BookClub.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("User");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -251,7 +260,10 @@ namespace BookClub.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", t =>
+                        {
+                            t.HasCheckConstraint("CK_Users_Role", "\"Role\" IN ('User', 'Admin')");
+                        });
                 });
 
             modelBuilder.Entity("BookClub.Models.UserBook", b =>
