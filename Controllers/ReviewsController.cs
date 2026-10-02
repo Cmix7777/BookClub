@@ -70,7 +70,7 @@ public class ReviewsController : ControllerBase
 
         var review = await _context.Reviews
             .FirstOrDefaultAsync(r => r.BookId == bookId && r.UserId == userId);
-
+        var now = DateTime.UtcNow;
         var isNew = review is null;
         if (review is null)
         {
@@ -78,7 +78,8 @@ public class ReviewsController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 BookId = bookId,
-                UserId = userId
+                UserId = userId,
+                CreatedAt = now
             };
             _context.Reviews.Add(review);
         }
@@ -86,7 +87,7 @@ public class ReviewsController : ControllerBase
         review.Rating = dto.Rating!.Value;
         review.Text = dto.Text.Trim();
         review.IsAnonymous = dto.IsAnonymous;
-        review.UpdatedAt = DateTime.UtcNow;
+        review.UpdatedAt = now;
 
         try
         {
