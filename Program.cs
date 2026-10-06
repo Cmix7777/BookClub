@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using System.Text;
 using BookClub.Data;
 using BookClub.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
@@ -33,6 +35,31 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             RoleClaimType = "role"
+        };
+
+        // после проверки подписи сверяем токен с актуальным состоянием в базе
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (!Guid.TryParse(sub, out var userId))
+                {
+                    context.Fail("Некорректный токен");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var state = await db.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { u.Role, u.IsBlocked })
+                    .FirstOrDefaultAsync();
+
+                var tokenRole = context.Principal!.FindFirstValue("role");
+
+                if (state is null || state.IsBlocked || state.Role != tokenRole)
+                    context.Fail("Токен больше не действителен, войдите заново");
+            }
         };
     });
 

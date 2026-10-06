@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace BookClub.Dtos;
 
 public class AdminStatsDto
@@ -22,4 +24,31 @@ public class AdminUserDto
     public DateTime CreatedAt { get; set; }
     public int ClubsCount { get; set; }
     public int ReviewsCount { get; set; }
+}
+
+public class ChangeRoleDto
+{
+    [Required(ErrorMessage = "Укажите роль")]
+    [RegularExpression("^(User|Admin)$", ErrorMessage = "Роль может быть только User или Admin")]
+    public string Role { get; set; } = string.Empty;
+}
+
+public class AdminReviewDto
+{
+    public Guid Id { get; set; }
+    public Guid BookId { get; set; }
+    public string BookTitle { get; set; } = string.Empty;
+    public Guid AuthorId { get; set; }
+    public string AuthorUsername { get; set; } = string.Empty;
+    public bool IsAnonymous { get; set; }
+    public int Rating { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class DuplicateBooksDto
+{
+    public string Title { get; set; } = string.Empty;
+    public string Author { get; set; } = string.Empty;
+    public List<Guid> BookIds { get; set; } = new();
 }
