@@ -77,5 +77,15 @@ public class AppDbContext : DbContext
         // роль — только одно из двух значений
         modelBuilder.Entity<User>()
             .ToTable(t => t.HasCheckConstraint("CK_Users_Role", "\"Role\" IN ('User', 'Admin')"));
+
+        // статус книги на полке — только одно из трёх значений
+        modelBuilder.Entity<UserBook>()
+            .ToTable(t => t.HasCheckConstraint(
+                "CK_UserBooks_Status", "\"Status\" IN ('WantToRead', 'Reading', 'Finished')"));
+
+        // личная оценка — либо пусто, либо от 1 до 5
+        modelBuilder.Entity<UserBook>()
+            .ToTable(t => t.HasCheckConstraint(
+                "CK_UserBooks_Rating", "\"Rating\" IS NULL OR \"Rating\" BETWEEN 1 AND 5"));
     }
 }

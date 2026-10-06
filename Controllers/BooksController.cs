@@ -1,9 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BookClub.Data;
 using BookClub.Dtos;
 using BookClub.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace BookClub.Controllers;
 
@@ -21,18 +21,18 @@ public class BooksController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<BookDto>>> GetBooks()
     {
-        var books = await _context.Books
+        return await _context.Books
+            .OrderBy(b => b.Title)
             .Select(b => new BookDto
             {
                 Id = b.Id,
                 Title = b.Title,
                 Author = b.Author,
                 Genre = b.Genre,
-                Year = b.Year
+                Year = b.Year,
+                Pages = b.Pages
             })
             .ToListAsync();
-
-        return books;
     }
 
     [HttpGet("{id}")]
@@ -46,7 +46,8 @@ public class BooksController : ControllerBase
                 Title = b.Title,
                 Author = b.Author,
                 Genre = b.Genre,
-                Year = b.Year
+                Year = b.Year,
+                Pages = b.Pages
             })
             .FirstOrDefaultAsync();
 
@@ -55,6 +56,7 @@ public class BooksController : ControllerBase
 
         return book;
     }
+
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<BookDto>> CreateBook(CreateBookDto dto)
@@ -65,7 +67,8 @@ public class BooksController : ControllerBase
             Title = dto.Title.Trim(),
             Author = dto.Author.Trim(),
             Genre = dto.Genre.Trim(),
-            Year = dto.Year
+            Year = dto.Year,
+            Pages = dto.Pages
         };
 
         _context.Books.Add(book);
@@ -77,7 +80,8 @@ public class BooksController : ControllerBase
             Title = book.Title,
             Author = book.Author,
             Genre = book.Genre,
-            Year = book.Year
+            Year = book.Year,
+            Pages = book.Pages
         };
 
         return CreatedAtAction(nameof(GetBook), new { id = book.Id }, result);

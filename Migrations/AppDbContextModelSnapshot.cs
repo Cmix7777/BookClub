@@ -36,6 +36,9 @@ namespace BookClub.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("Pages")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -295,7 +298,12 @@ namespace BookClub.Migrations
                     b.HasIndex("UserId", "BookId")
                         .IsUnique();
 
-                    b.ToTable("UserBooks");
+                    b.ToTable("UserBooks", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserBooks_Rating", "\"Rating\" IS NULL OR \"Rating\" BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("CK_UserBooks_Status", "\"Status\" IN ('WantToRead', 'Reading', 'Finished')");
+                        });
                 });
 
             modelBuilder.Entity("BookClub.Models.Vote", b =>

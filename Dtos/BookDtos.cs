@@ -10,6 +10,7 @@ public class BookDto
     public string Author { get; set; } = string.Empty;
     public string Genre { get; set; } = string.Empty;
     public int? Year { get; set; }
+    public int? Pages { get; set; }
 }
 
 // то, что сервер принимает при создании книги
@@ -28,4 +29,7 @@ public class CreateBookDto
 
     [Range(1000, 2100, ErrorMessage = "Год должен быть от 1000 до 2100")]
     public int? Year { get; set; }
+    
+    [Range(1, 10000, ErrorMessage = "Число страниц от 1 до 10000")]
+    public int? Pages { get; set; }
 }
