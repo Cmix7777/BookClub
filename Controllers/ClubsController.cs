@@ -154,4 +154,27 @@ public class ClubsController : ControllerBase
             })
             .ToListAsync();
     }
-}
+
+    [HttpGet("{clubId}/polls")]
+    public async Task<ActionResult<List<ClubPollDto>>> GetClubPolls(Guid clubId)
+    {
+        var clubExists = await _context.Clubs.AnyAsync(c => c.Id == clubId);
+        if (!clubExists)
+            return NotFound("Клуб не найден");
+
+        var now = DateTime.UtcNow;
+
+        return await _context.Polls
+            .Where(p => p.ClubId == clubId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new ClubPollDto
+            {
+                Id = p.Id,
+                Question = p.Question,
+                IsClosed = p.IsClosed || p.ClosesAt <= now,
+                ClosesAt = p.ClosesAt,
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+    }
+    }

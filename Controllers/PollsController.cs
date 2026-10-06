@@ -64,8 +64,7 @@ public class PollsController : ControllerBase
             Id = Guid.NewGuid(),
             ClubId = clubId,
             Question = dto.Question.Trim(),
-            ClosesAt = now.AddHours(dto.DurationHours)
-        };
+            ClosesAt = now.AddMinutes(dto.DurationMinutes)        };
 
         foreach (var bookId in bookIds)
         {
@@ -96,6 +95,7 @@ public class PollsController : ControllerBase
                 Question = p.Question,
                 IsClosed = p.IsClosed || p.ClosesAt <= now,
                 ClosesAt = p.ClosesAt,
+                CreatedAt = p.CreatedAt,
                 VotersCount = _context.PollVoteChecks.Count(c => c.PollId == p.Id),
                 HasVoted = _context.PollVoteChecks.Any(c => c.PollId == p.Id && c.UserId == userId),
                 Options = p.Options.Select(o => new PollOptionDto
