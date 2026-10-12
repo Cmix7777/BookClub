@@ -1,0 +1,189 @@
+run=5
+sha=e9f23bfe3ecd71949a83b90d6b779f555f976515
+result=success
+time=2026-10-12T12:44:41Z
+--- jobs ---
+### Admin  (маска: **/Controllers/AdminController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 34 s - BookClub.Mutation.dll (net10.0)
+[12:42:18 INF] Time Elapsed 00:06:32.8907539
+[12:42:18 INF] The final mutation score is 94.23 %
+[12:39:11 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:39:11 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Auth  (маска: **/Controllers/AuthController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 25 s - BookClub.Mutation.dll (net10.0)
+[12:42:48 INF] Time Elapsed 00:07:12.6905512
+[12:42:48 INF] The final mutation score is 92.31 %
+[12:38:47 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:47 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Books  (маска: **/Controllers/BooksController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 24 s - BookClub.Mutation.dll (net10.0)
+[12:39:44 INF] Time Elapsed 00:04:06.2471469
+[12:39:44 INF] The final mutation score is 100.00 %
+[12:38:46 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:46 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Clubs  (маска: **/Controllers/ClubsController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 24 s - BookClub.Mutation.dll (net10.0)
+[12:42:26 INF] Time Elapsed 00:06:48.6346599
+[12:42:26 INF] The final mutation score is 93.48 %
+[12:38:45 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:45 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Polls  (маска: **/Controllers/PollsController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 35 s - BookClub.Mutation.dll (net10.0)
+[12:43:25 INF] Time Elapsed 00:07:42.2338674
+[12:43:25 INF] The final mutation score is 93.75 %
+[12:39:09 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:39:09 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Reviews  (маска: **/Controllers/ReviewsController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 24 s - BookClub.Mutation.dll (net10.0)
+[12:41:54 INF] Time Elapsed 00:06:25.0932197
+[12:41:54 INF] The final mutation score is 100.00 %
+[12:38:37 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:37 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Services  (маска: **/Services/*.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 24 s - BookClub.Mutation.dll (net10.0)
+[12:41:57 INF] Time Elapsed 00:06:19.6830033
+[12:41:57 INF] The final mutation score is 66.67 %
+[12:38:47 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:47 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Shelf  (маска: **/Controllers/ShelfController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 34 s - BookClub.Mutation.dll (net10.0)
+[12:43:36 INF] Time Elapsed 00:07:46.3115344
+[12:43:36 INF] The final mutation score is 97.62 %
+[12:39:18 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:39:18 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Users  (маска: **/Controllers/UsersController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 15 s - BookClub.Mutation.dll (net10.0)
+[12:38:31 INF] Time Elapsed 00:02:59.1388516
+[12:38:31 INF] The final mutation score is 100.00 %
+[12:38:18 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:18 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+### Votes  (маска: **/Controllers/VotesController.cs)
+build: success
+migrate: success
+twin: success
+install: success
+stryker: success
+Passed!  - Failed:     0, Passed:   199, Skipped:     0, Total:   199, Duration: 1 m 24 s - BookClub.Mutation.dll (net10.0)
+[12:44:30 INF] Time Elapsed 00:08:57.1059593
+[12:44:30 INF] The final mutation score is 95.31 %
+[12:38:42 INF] 1     mutants got status CompileError. Reason: Could not be injected in code.
+[12:38:42 INF] 17    mutants got status CompileError. Reason: Mutant caused compile errors
+
+--- report ---
+## Проверка тестов мутациями (Stryker)
+
+Оценка по файлам. Убито: тесты заметили порчу. Выжило: не заметили. Не покрыто: ни один тест не заходит в это место.
+
+| Файл | Убито | Выжило | Не покрыто | Время вышло | Оценка |
+|---|---|---|---|---|---|
+| AdminController.cs | 49 | 3 | 0 | 0 | 94.2% |
+| AuthController.cs | 24 | 1 | 1 | 0 | 92.3% |
+| BooksController.cs | 10 | 0 | 0 | 0 | 100.0% |
+| ClubsController.cs | 43 | 3 | 0 | 0 | 93.5% |
+| PollsController.cs | 30 | 2 | 0 | 0 | 93.8% |
+| ReviewsController.cs | 42 | 0 | 0 | 0 | 100.0% |
+| ShelfController.cs | 41 | 1 | 0 | 0 | 97.6% |
+| TokenService.cs | 6 | 2 | 1 | 0 | 66.7% |
+| UsersController.cs | 6 | 0 | 0 | 0 | 100.0% |
+| VotesController.cs | 61 | 3 | 0 | 0 | 95.3% |
+| **Всего** | 312 | 15 | 2 | 0 | **94.8%** |
+
+Какие виды порчи выживают чаще всего.
+
+| Вид порчи | Убито | Выжило | Не покрыто |
+|---|---|---|---|
+| Equality mutation | 111 | 9 | 0 |
+| String mutation | 16 | 1 | 1 |
+| Linq method mutation (Min() to Max()) | 0 | 2 | 0 |
+| Logical mutation | 30 | 1 | 0 |
+| Boolean mutation | 6 | 0 | 1 |
+| Conditional (true) mutation | 7 | 1 | 0 |
+| Null coalescing mutation (remove left) | 0 | 1 | 0 |
+| Block removal mutation | 16 | 0 | 0 |
+| Object initializer mutation | 38 | 0 | 0 |
+| LogicalNotExpression to un-LogicalNotExpression mutation | 19 | 0 | 0 |
+| Linq method mutation (OrderBy() to OrderByDescending()) | 4 | 0 | 0 |
+| Negate expression | 15 | 0 | 0 |
+| Statement mutation | 27 | 0 | 0 |
+| Linq method mutation (Take() to Skip()) | 1 | 0 | 0 |
+| Linq method mutation (OrderByDescending() to OrderBy()) | 6 | 0 | 0 |
+| Linq method mutation (Any() to All()) | 3 | 0 | 0 |
+| Conditional (false) mutation | 8 | 0 | 0 |
+| Linq method mutation (Average() to Min()) | 1 | 0 | 0 |
+| Linq method mutation (Sum() to Max()) | 1 | 0 | 0 |
+| Linq method mutation (Max() to Min()) | 1 | 0 | 0 |
+| Arithmetic mutation | 2 | 0 | 0 |
+
+Выжившие мутанты (первые 17 из 17): файл:строка, что сделали с кодом.
+
+- AdminController.cs:36 [выжил] Equality mutation: «p.ClosesAt > now» заменено на «p.ClosesAt >= now»
+- AdminController.cs:169 [выжил] Linq method mutation (Min() to Max()): «g.Min» заменено на «g.Max»
+- AdminController.cs:170 [выжил] Linq method mutation (Min() to Max()): «g.Min» заменено на «g.Max»
+- AuthController.cs:32 [выжил] Logical mutation: «u.Username == username || u.Email == email» заменено на «u.Username == username && u.Email == email»
+- AuthController.cs:128 [не покрыто] Boolean mutation: «false» заменено на «true»
+- ClubsController.cs:37 [выжил] Equality mutation: «p.ClosesAt > now» заменено на «p.ClosesAt >= now»
+- ClubsController.cs:57 [выжил] Equality mutation: «p.ClosesAt > now» заменено на «p.ClosesAt >= now»
+- ClubsController.cs:174 [выжил] Equality mutation: «p.ClosesAt <= now» заменено на «p.ClosesAt < now»
+- PollsController.cs:50 [выжил] Equality mutation: «p.ClosesAt > now» заменено на «p.ClosesAt >= now»
+- PollsController.cs:96 [выжил] Equality mutation: «p.ClosesAt <= now» заменено на «p.ClosesAt < now»
+- ShelfController.cs:103 [выжил] Conditional (true) mutation: «dto.Status == "Finished" ? dto.Rating : null» заменено на «(true?dto.Rating :null)»
+- TokenService.cs:21 [выжил] Null coalescing mutation (remove left): «_config["Jwt:ExpiresDays"] ?? "7"» заменено на «"7"»
+- TokenService.cs:21 [выжил] String mutation: «"Jwt:ExpiresDays"» заменено на «""»
+- TokenService.cs:21 [не покрыто] String mutation: «"7"» заменено на «""»
+- VotesController.cs:33 [выжил] Equality mutation: «poll.ClosesAt <= DateTime.UtcNow» заменено на «poll.ClosesAt < DateTime.UtcNow»
+- VotesController.cs:90 [выжил] Equality mutation: «poll.ClosesAt <= DateTime.UtcNow» заменено на «poll.ClosesAt < DateTime.UtcNow»
+- VotesController.cs:149 [выжил] Equality mutation: «poll.ClosesAt <= DateTime.UtcNow» заменено на «poll.ClosesAt < DateTime.UtcNow»
