@@ -92,6 +92,14 @@ jobs:
         continue-on-error: true
         run: k6 run --no-color --summary-export=load-summary.json tests/load/load.js 2>&1 | tee logs/load.log
 
+      # Поиск предела: ступеньки с растущим числом новых людей в секунду. Это измерение, а не приёмка,
+      # поэтому шаг не может покраснить запуск (continue-on-error и в конце его исход не проверяется).
+      - name: Stress test (finding the limit, informational)
+        id: stress
+        if: steps.smoke.outcome == 'success'
+        continue-on-error: true
+        run: k6 run --no-color tests/load/stress.js 2>&1 | tee logs/stress.log
+
       - name: Save results
         if: always()
         uses: actions/upload-artifact@v4
@@ -125,6 +133,11 @@ jobs:
             done
             if [ -f logs/smoke.log ]; then echo "--- smoke (tail) ---"; tail -n 45 logs/smoke.log; fi
             if [ -f logs/load.log ]; then echo "--- load (tail) ---"; tail -n 110 logs/load.log; fi
+            if [ -f logs/stress.log ]; then
+              echo "--- stress (per step) ---"
+              grep -E "rate_[0-9]+|dropped_iterations|iterations\.+:|http_req_failed|vus_max" logs/stress.log
+              echo "--- stress (tail) ---"; tail -n 25 logs/stress.log
+            fi
             if [ -f site.log ]; then echo "--- site.log (tail) ---"; tail -n 30 site.log; fi
           } > "$RUNNER_TEMP/status/status-load.txt"
           cd "$RUNNER_TEMP/status"
