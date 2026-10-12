@@ -1,0 +1,107 @@
+name: Tests
+
+# Автотесты BookClub: на каждый коммит поднимаем настоящую базу PostgreSQL, запускаем сайт
+# и проверяем его двумя способами: запросами к API и сценариями в настоящем браузере.
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bookclub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      # настройки сайта (в обычной жизни их хранят в user-secrets; здесь база одноразовая, ключ тестовый)
+      ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=bookclub_test;Username=postgres;Password=postgres
+      Jwt__Key: ci-only-signing-key-for-tests-0123456789-abcdefghijklmnop
+      # настройки тестов
+      BOOKCLUB_URL: http://127.0.0.1:5153
+      BOOKCLUB_TEST_DB: Host=127.0.0.1;Port=5432;Database=bookclub_test;Username=postgres;Password=postgres
+      BOOKCLUB_TEST_JWT_KEY: ci-only-signing-key-for-tests-0123456789-abcdefghijklmnop
+      BOOKCLUB_ARTIFACTS: ${{ github.workspace }}/artifacts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the site
+        run: dotnet build BookClub.csproj -c Release
+
+      - name: Create database tables (EF migrations)
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.12
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef database update --no-build --configuration Release
+
+      - name: Start the site
+        run: |
+          nohup dotnet run --no-build --no-launch-profile -c Release --project BookClub.csproj --urls http://127.0.0.1:5153 > site.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5153/api/books > /dev/null 2>&1; then echo "Site is up after $i s"; exit 0; fi
+            sleep 1
+          done
+          echo "Site did not start"; cat site.log; exit 1
+
+      - name: Build the tests
+        run: dotnet build tests/BookClub.Tests -c Release
+
+      - name: Install the browser for Playwright
+        run: pwsh tests/BookClub.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: API tests
+        id: api
+        continue-on-error: true
+        run: >
+          dotnet test tests/BookClub.Tests -c Release --no-build --filter "Category=Api"
+          --logger "trx;LogFileName=api.trx" --results-directory test-results
+
+      - name: Browser tests (end-to-end)
+        id: e2e
+        continue-on-error: true
+        run: >
+          dotnet test tests/BookClub.Tests -c Release --no-build --filter "Category=E2E"
+          --logger "trx;LogFileName=e2e.trx" --results-directory test-results
+
+      - name: Test report
+        if: always()
+        run: python3 tests/report.py test-results >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results
+            artifacts
+            site.log
+          if-no-files-found: ignore
+
+      - name: Fail the run if any test failed
+        if: steps.api.outcome == 'failure' || steps.e2e.outcome == 'failure'
+        run: exit 1

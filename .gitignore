@@ -480,3 +480,9 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Результаты автотестов
+test-results/
+e2e-failures/
+artifacts/
+site.log
