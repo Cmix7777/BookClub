@@ -78,13 +78,13 @@ public class VotingTests
         (await Vote(guest, secondPoll, 0)).ShouldBe(409);
     }
 
-    [Fact(DisplayName = "Пять одновременных голосов одного человека: засчитан ровно один, остальные 409, ни одной ошибки сервера")]
+    [Fact(DisplayName = "Двадцать одновременных голосов одного человека: засчитан ровно один, остальные 409, ни одной ошибки сервера")]
     public async Task Parallel_votes_of_one_user_count_once()
     {
         var owner = await TestUser.Create();
         var poll = await Make.Poll(owner, await Make.Club(owner));
 
-        var replies = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => Vote(owner, poll, 0)));
+        var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Vote(owner, poll, 0)));
 
         Assert.Equal(1, replies.Count(r => r.Code == 200));
         Assert.All(replies.Where(r => r.Code != 200), r => Assert.Equal(409, r.Code));

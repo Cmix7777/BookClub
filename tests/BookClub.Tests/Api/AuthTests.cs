@@ -291,4 +291,16 @@ public class AuthTests
 
     private static string ToBase64Url(byte[] data) =>
         Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    [Fact(DisplayName = "Двенадцать одновременных регистраций одного логина: создан один человек, остальные получают 409, ни одной ошибки сервера")]
+    public async Task Parallel_registrations_of_one_username_create_one_user()
+    {
+        var name = "race" + Make.Tag();
+
+        var replies = await Task.WhenAll(Enumerable.Range(0, 12).Select(i => Api.Post("api/auth/register",
+            new { username = name, email = name + i + "@example.test", password = "Passw0rd!test" })));
+
+        Assert.Equal(1, replies.Count(r => r.Code == 201));
+        Assert.All(replies.Where(r => r.Code != 201), r => Assert.Equal(409, r.Code));
+    }
 }
