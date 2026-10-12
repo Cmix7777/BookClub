@@ -123,6 +123,7 @@ jobs:
           RESULT: ${{ job.status }}
           STEPS_JSON: ${{ toJSON(steps) }}
         run: |
+          set +e   # итог нужно выложить при любом исходе, в том числе когда grep ничего не нашёл
           mkdir -p "$RUNNER_TEMP/status"
           {
             echo "run=${GITHUB_RUN_NUMBER}"
