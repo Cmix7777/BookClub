@@ -238,4 +238,17 @@ public class ShelfTests
         Assert.Equal("WantToRead", (await ItemOf(first, bookId)).GetProperty("status").GetString());
         Assert.Equal("Reading", (await ItemOf(second, bookId)).GetProperty("status").GetString());
     }
+
+    [Fact(DisplayName = "Двадцать одновременных добавлений одной книги на полку: добавлена одна, остальные 409, ни одной ошибки сервера")]
+    public async Task Parallel_adds_to_shelf_count_once()
+    {
+        var user = await TestUser.Create();
+        var bookId = await Make.Book(user);
+
+        var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Add(user, bookId)));
+
+        Assert.Equal(1, replies.Count(r => r.Code == 201));
+        Assert.All(replies.Where(r => r.Code != 201), r => Assert.Equal(409, r.Code));
+        Assert.Single((await Api.Get("api/me/books", user.Token)).ShouldBe(200).Items());
+    }
 }
