@@ -254,4 +254,132 @@ public class AdminTests
         (await Api.Get($"api/books/{poll.BookIds[0]}")).ShouldBe(200);
         (await Api.Delete($"api/admin/books/{Guid.NewGuid()}", admin.Token)).ShouldBe(404);
     }
+
+    // ---------- порядок списков, счётчики, дубликаты ----------
+
+    [Fact(DisplayName = "Список пользователей для админа идёт в порядке регистрации: сначала самые давние")]
+    public async Task User_list_is_ordered_by_registration()
+    {
+        var admin = await TestUser.CreateAdmin();
+        var first = await TestUser.Create();
+        await Task.Delay(50);
+        var second = await TestUser.Create();
+
+        var ids = (await Api.Get("api/admin/users", admin.Token)).ShouldBe(200).Items()
+            .Select(u => u.GetProperty("id").GetGuid()).ToList();
+
+        Assert.True(ids.IndexOf(first.Id) >= 0 && ids.IndexOf(first.Id) < ids.IndexOf(second.Id));
+    }
+
+    [Fact(DisplayName = "В списке пользователей у каждого свой счётчик рецензий")]
+    public async Task User_list_counts_reviews_per_user()
+    {
+        var admin = await TestUser.CreateAdmin();
+        var one = await TestUser.Create();
+        var two = await TestUser.Create();
+        var none = await TestUser.Create();
+        var oneBook = await Make.Book(one);
+        await Api.Put($"api/books/{oneBook}/reviews/mine", new { rating = 4 }, one.Token);
+        for (var i = 0; i < 2; i++)
+        {
+            var book = await Make.Book(two);
+            await Api.Put($"api/books/{book}/reviews/mine", new { rating = 3 }, two.Token);
+        }
+
+        var list = (await Api.Get("api/admin/users", admin.Token)).ShouldBe(200).Items();
+        int ReviewsOf(TestUser u) =>
+            list.Single(r => r.GetProperty("id").GetGuid() == u.Id).GetProperty("reviewsCount").GetInt32();
+
+        Assert.Equal(1, ReviewsOf(one));
+        Assert.Equal(2, ReviewsOf(two));
+        Assert.Equal(0, ReviewsOf(none));
+    }
+
+    [Fact(DisplayName = "Список рецензий для админа: самые свежие сверху")]
+    public async Task Review_list_shows_newest_first()
+    {
+        var admin = await TestUser.CreateAdmin();
+        var author = await TestUser.Create();
+        var olderBook = await Make.Book(author);
+        var newerBook = await Make.Book(author);
+        await Api.Put($"api/books/{olderBook}/reviews/mine", new { rating = 3 }, author.Token);
+        await Task.Delay(50);
+        await Api.Put($"api/books/{newerBook}/reviews/mine", new { rating = 3 }, author.Token);
+
+        var books = (await Api.Get("api/admin/reviews?take=200", admin.Token)).ShouldBe(200).Items()
+            .Select(r => r.GetProperty("bookId").GetGuid()).ToList();
+        var newer = books.IndexOf(newerBook);
+        var older = books.IndexOf(olderBook);
+
+        // если за это время набежало больше 200 более свежих рецензий, старая просто не поместилась в список
+        Assert.True(newer >= 0 && (older == -1 || newer < older));
+    }
+
+    [Fact(DisplayName = "В списке дубликатов нет книг, у которых нет двойника")]
+    public async Task Unique_books_are_not_listed_as_duplicates()
+    {
+        var admin = await TestUser.CreateAdmin();
+        var user = await TestUser.Create();
+        var lone = await Make.Book(user);
+
+        var groups = (await Api.Get("api/admin/books/duplicates", admin.Token)).ShouldBe(200).Items();
+
+        Assert.DoesNotContain(groups, g => g.GetProperty("bookIds").EnumerateArray().Any(id => id.GetGuid() == lone));
+    }
+
+    private static async Task<int> StatOf(TestUser admin, string name) =>
+        (await Api.Get("api/admin/stats", admin.Token)).ShouldBe(200).Int(name);
+
+    /// <summary>
+    /// Счётчики админки общие для всех тестов, идущих одновременно, поэтому точное число не проверить.
+    /// Меряем разницу «до и после» своего действия, а если вмешался чужой тест, повторяем попытку.
+    /// <paramref name="prepare"/> готовит всё нужное и возвращает само действие, которое и измеряется.
+    /// </summary>
+    private static async Task<bool> ChangesBy(TestUser admin, string stat, int expected, Func<Task<Func<Task>>> prepare)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var act = await prepare();
+            var before = await StatOf(admin, stat);
+            await act();
+            var after = await StatOf(admin, stat);
+            if (after - before == expected)
+                return true;
+        }
+
+        return false;
+    }
+
+    [Fact(DisplayName = "Счётчик админов в статистике растёт на единицу, когда появляется новый админ")]
+    public async Task Stats_count_admins()
+    {
+        var admin = await TestUser.CreateAdmin();
+
+        var counted = await ChangesBy(admin, "admins", 1, () =>
+            Task.FromResult<Func<Task>>(async () => await TestUser.CreateAdmin()));
+
+        Assert.True(counted, "новый админ не прибавил единицу к счётчику админов");
+    }
+
+    [Fact(DisplayName = "Счётчик идущих отборов: новый отбор добавляет единицу, закрытый убавляет")]
+    public async Task Stats_count_active_polls()
+    {
+        var admin = await TestUser.CreateAdmin();
+
+        var created = await ChangesBy(admin, "activePolls", 1, async () =>
+        {
+            var owner = await TestUser.Create();
+            var clubId = await Make.Club(owner);
+            return async () => await Make.Poll(owner, clubId);
+        });
+        Assert.True(created, "новый отбор не прибавил единицу к счётчику идущих отборов");
+
+        var closed = await ChangesBy(admin, "activePolls", -1, async () =>
+        {
+            var owner = await TestUser.Create();
+            var poll = await Make.Poll(owner, await Make.Club(owner));
+            return async () => await Make.Close(owner, poll);
+        });
+        Assert.True(closed, "закрытый отбор не убавил единицу в счётчике идущих отборов");
+    }
 }

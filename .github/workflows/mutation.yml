@@ -5,7 +5,8 @@ name: Mutation
 # мутант «выжил», и это место, где тесты слабее, чем казалось.
 #
 # Каждый файл сайта проверяется отдельным заданием, все задания идут параллельно, а в конце одно общее
-# задание собирает итог. Запуск вручную (Actions, Mutation, Run workflow), при изменении самой проверки
+# задание собирает итог. Program.cs не проверяется: это настройка запуска, она выполняется один раз при старте
+# сайта, а в этой схеме сайт стартует один раз на весь тестовый процесс, так что порча там не измеряется. Запуск вручную (Actions, Mutation, Run workflow), при изменении самой проверки
 # и при изменении API-тестов.
 on:
   workflow_dispatch:
@@ -41,7 +42,6 @@ jobs:
           - { name: Users,    files: '**/Controllers/UsersController.cs' }
           - { name: Votes,    files: '**/Controllers/VotesController.cs' }
           - { name: Services, files: '**/Services/*.cs' }
-          - { name: Program,  files: '**/Program.cs' }
 
     services:
       postgres:
@@ -183,7 +183,7 @@ jobs:
             echo "result=${RESULT}"
             echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "--- jobs ---"
-            for f in all/*/part.txt; do [ -f "$f" ] && cat "$f"; done
+            for f in $(find all -name part.txt | sort); do cat "$f"; done
             echo "--- report ---"
             python3 tests/mutation-report.py all 200 2>&1
           } > "$RUNNER_TEMP/status/status-mutation.txt"

@@ -167,4 +167,31 @@ public class ClubsTests
 
         Assert.True((await Api.Get("api/clubs/" + clubId)).ShouldBe(200).Bool("hasActivePoll"));
     }
+
+    [Fact(DisplayName = "В общем списке клубов флаг «идёт отбор» следует за отбором: нет, есть, снова нет после закрытия")]
+    public async Task Active_poll_flag_in_the_list_follows_the_poll()
+    {
+        var owner = await TestUser.Create();
+        var clubId = await Make.Club(owner);
+        Assert.False(FlagInList(await Api.Get("api/clubs"), clubId));
+
+        var poll = await Make.Poll(owner, clubId);
+        Assert.True(FlagInList(await Api.Get("api/clubs"), clubId));
+
+        await Make.Close(owner, poll);
+        Assert.False(FlagInList(await Api.Get("api/clubs"), clubId));
+    }
+
+    private static bool FlagInList(Reply list, Guid clubId) =>
+        list.ShouldBe(200).Items()
+            .Single(c => c.GetProperty("id").GetGuid() == clubId)
+            .GetProperty("hasActivePoll").GetBoolean();
+
+    [Fact(DisplayName = "Отборы несуществующего клуба: 404")]
+    public async Task Polls_of_unknown_club_are_not_found()
+    {
+        var user = await TestUser.Create();
+
+        (await Api.Get($"api/clubs/{Guid.NewGuid()}/polls", user.Token)).ShouldBe(404);
+    }
 }

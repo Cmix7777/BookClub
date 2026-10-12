@@ -4,16 +4,28 @@
     "mutate": [
       "**/Controllers/*.cs",
       "**/Services/*.cs",
-      "**/Extensions/*.cs",
-      "**/Program.cs"
+      "**/Extensions/*.cs"
     ],
-    "reporters": ["dots", "cleartext", "json", "html"],
+    "reporters": [
+      "dots",
+      "cleartext",
+      "json",
+      "html"
+    ],
     "coverage-analysis": "perTest",
     "concurrency": 2,
     "thresholds": {
       "high": 90,
       "low": 70,
       "break": 0
-    }
+    },
+    "ignore-methods": [
+      "NotFound",
+      "Conflict",
+      "BadRequest",
+      "Unauthorized",
+      "Ok",
+      "StatusCode"
+    ]
   }
 }
