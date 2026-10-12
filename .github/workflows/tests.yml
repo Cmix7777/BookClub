@@ -9,12 +9,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # нужно только чтобы выложить короткий итог проверок в ветку ci-status
 
 jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash   # с проверкой каждой части конвейера: упавший тест не прячется за tee
 
     services:
       postgres:
@@ -49,16 +52,24 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Prepare log folder
+        run: mkdir -p logs
+
       - name: Build the site
-        run: dotnet build BookClub.csproj -c Release
+        id: build
+        run: dotnet build BookClub.csproj -c Release 2>&1 | tee logs/build.log
 
       - name: Create database tables (EF migrations)
+        id: migrate
         run: |
-          dotnet tool install --global dotnet-ef --version 10.0.12
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet ef database update --no-build --configuration Release
+          {
+            dotnet tool install --global dotnet-ef --version 10.0.12
+            export PATH="$PATH:$HOME/.dotnet/tools"
+            dotnet ef database update --no-build --configuration Release
+          } 2>&1 | tee logs/migrate.log
 
       - name: Start the site
+        id: site
         run: |
           nohup dotnet run --no-build --no-launch-profile -c Release --project BookClub.csproj --urls http://127.0.0.1:5153 > site.log 2>&1 &
           for i in $(seq 1 60); do
@@ -68,24 +79,26 @@ jobs:
           echo "Site did not start"; cat site.log; exit 1
 
       - name: Build the tests
-        run: dotnet build tests/BookClub.Tests -c Release
+        id: testbuild
+        run: dotnet build tests/BookClub.Tests -c Release 2>&1 | tee logs/testbuild.log
 
       - name: Install the browser for Playwright
-        run: pwsh tests/BookClub.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+        id: browser
+        run: pwsh tests/BookClub.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium 2>&1 | tee logs/browser.log
 
       - name: API tests
         id: api
         continue-on-error: true
         run: >
           dotnet test tests/BookClub.Tests -c Release --no-build --filter "Category=Api"
-          --logger "trx;LogFileName=api.trx" --results-directory test-results
+          --logger "trx;LogFileName=api.trx" --results-directory test-results 2>&1 | tee logs/api.log
 
       - name: Browser tests (end-to-end)
         id: e2e
         continue-on-error: true
         run: >
           dotnet test tests/BookClub.Tests -c Release --no-build --filter "Category=E2E"
-          --logger "trx;LogFileName=e2e.trx" --results-directory test-results
+          --logger "trx;LogFileName=e2e.trx" --results-directory test-results 2>&1 | tee logs/e2e.log
 
       - name: Test report
         if: always()
@@ -99,8 +112,43 @@ jobs:
           path: |
             test-results
             artifacts
+            logs
             site.log
           if-no-files-found: ignore
+
+      - name: Publish a short summary to branch ci-status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/status"
+          {
+            echo "run=${GITHUB_RUN_NUMBER}"
+            echo "sha=${GITHUB_SHA}"
+            echo "result=${RESULT}"
+            echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "--- steps ---"
+            python3 -c 'import json,os; d=json.loads(os.environ["STEPS_JSON"]); [print(k+": "+str(v.get("outcome"))) for k,v in d.items()]'
+            echo "--- report ---"
+            python3 tests/report.py test-results 2>&1 || true
+            echo "--- failed browser pages (text on screen) ---"
+            for f in $(ls artifacts/*.txt 2>/dev/null | head -n 8); do echo "# $f"; head -c 1200 "$f"; echo; done
+            for n in build migrate testbuild browser; do
+              if [ -f "logs/$n.log" ]; then echo "--- $n (tail) ---"; tail -n 25 "logs/$n.log"; fi
+            done
+            for n in api e2e; do
+              if [ -f "logs/$n.log" ]; then echo "--- $n (errors) ---"; grep -E "Failed |Error Message|Assert|Expected|Actual|Exception|error " "logs/$n.log" | head -n 80; fi
+            done
+            if [ -f site.log ]; then echo "--- site.log (tail) ---"; tail -n 30 site.log; fi
+          } > "$RUNNER_TEMP/status/status.txt"
+          cd "$RUNNER_TEMP/status"
+          git init -q
+          git checkout -q -b ci-status
+          git add status.txt
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Проверки ${GITHUB_RUN_NUMBER}: ${RESULT}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-status
 
       - name: Fail the run if any test failed
         if: steps.api.outcome == 'failure' || steps.e2e.outcome == 'failure'
