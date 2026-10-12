@@ -75,8 +75,17 @@ jobs:
           done
           echo "Site did not start"; cat site.log; exit 1
 
+      # Скачивание k6 с GitHub иногда отвечает 504. Одна повторная попытка спасает запуск от случайного сбоя.
       - name: Install k6
         id: k6
+        continue-on-error: true
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: '2.3.0'
+
+      - name: Install k6 (second attempt)
+        id: k6_retry
+        if: steps.k6.outcome == 'failure'
         uses: grafana/setup-k6-action@v1
         with:
           k6-version: '2.3.0'

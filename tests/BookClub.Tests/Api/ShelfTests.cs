@@ -204,4 +204,38 @@ public class ShelfTests
 
         Assert.Equal("WantToRead", (await ItemOf(owner, bookId)).GetProperty("status").GetString());
     }
+
+    [Theory(DisplayName = "Фильтр по статусу работает для каждого из трёх статусов")]
+    [InlineData("WantToRead")]
+    [InlineData("Reading")]
+    [InlineData("Finished")]
+    public async Task Shelf_filter_works_for_every_status(string status)
+    {
+        var user = await TestUser.Create();
+        var wanted = await Make.Book(user);
+        var reading = await Make.Book(user);
+        var finished = await Make.Book(user);
+        await Add(user, wanted, "WantToRead");
+        await Add(user, reading, "Reading");
+        await Add(user, finished, "Finished");
+        var expected = status switch { "WantToRead" => wanted, "Reading" => reading, _ => finished };
+
+        var filtered = (await Api.Get("api/me/books?status=" + status, user.Token)).ShouldBe(200).Items();
+
+        Assert.Equal(expected, Assert.Single(filtered).GetProperty("bookId").GetGuid());
+    }
+
+    [Fact(DisplayName = "Одну и ту же книгу могут положить на свои полки разные люди")]
+    public async Task Different_people_can_shelve_the_same_book()
+    {
+        var first = await TestUser.Create();
+        var second = await TestUser.Create();
+        var bookId = await Make.Book(first);
+
+        (await Add(first, bookId)).ShouldBe(201);
+        (await Add(second, bookId, "Reading")).ShouldBe(201);
+
+        Assert.Equal("WantToRead", (await ItemOf(first, bookId)).GetProperty("status").GetString());
+        Assert.Equal("Reading", (await ItemOf(second, bookId)).GetProperty("status").GetString());
+    }
 }

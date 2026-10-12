@@ -236,4 +236,18 @@ public class ReviewsTests
 
         Assert.Equal(1, (await Api.Get($"api/books/{bookId}/reviews")).ShouldBe(200).Int("count"));
     }
+
+    [Fact(DisplayName = "Ответ на отправку анонимной рецензии не выдаёт автора, а с подписью имя автора в ответе есть")]
+    public async Task Reply_to_writing_follows_anonymity()
+    {
+        var author = await TestUser.Create();
+        var bookId = await Make.Book(author);
+
+        var anonymous = (await Write(author, bookId, 4, "Без подписи", anonymous: true)).ShouldBe(201);
+        Assert.Equal(JsonValueKind.Null, anonymous.Json.GetProperty("author").ValueKind);
+        Assert.DoesNotContain(author.Username, anonymous.Body);
+
+        var signed = (await Write(author, bookId, 4, "С подписью", anonymous: false)).ShouldBe(200);
+        Assert.Equal(author.Username, signed.Str("author"));
+    }
 }

@@ -35,4 +35,19 @@ public class UsersTests
     {
         (await Api.Get("api/users/" + Guid.NewGuid())).ShouldBe(404);
     }
+
+    [Fact(DisplayName = "Общий список пользователей идёт по алфавиту логинов")]
+    public async Task Public_list_is_sorted_by_username()
+    {
+        var first = await TestUser.Create();
+        var second = await TestUser.Create();
+        var (smaller, larger) = string.CompareOrdinal(first.Username, second.Username) < 0
+            ? (first, second)
+            : (second, first);
+
+        var names = (await Api.Get("api/users")).ShouldBe(200).Items()
+            .Select(u => u.GetProperty("username").GetString()!).ToList();
+
+        Assert.True(names.IndexOf(smaller.Username) < names.IndexOf(larger.Username));
+    }
 }
