@@ -239,16 +239,22 @@ public class ShelfTests
         Assert.Equal("Reading", (await ItemOf(second, bookId)).GetProperty("status").GetString());
     }
 
-    [Fact(DisplayName = "Двадцать одновременных добавлений одной книги на полку: добавлена одна, остальные 409, ни одной ошибки сервера")]
+    [Fact(DisplayName = "Тридцать одновременных добавлений одной книги на полку, пять раз подряд: добавлена одна, остальные 409, ни одной ошибки сервера")]
     public async Task Parallel_adds_to_shelf_count_once()
     {
         var user = await TestUser.Create();
-        var bookId = await Make.Book(user);
 
-        var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Add(user, bookId)));
+        // гонка случается не при каждой попытке, поэтому бросаем пять пачек запросов, каждая про новую книгу
+        for (var round = 0; round < 5; round++)
+        {
+            var bookId = await Make.Book(user);
 
-        Assert.Equal(1, replies.Count(r => r.Code == 201));
-        Assert.All(replies.Where(r => r.Code != 201), r => Assert.Equal(409, r.Code));
-        Assert.Single((await Api.Get("api/me/books", user.Token)).ShouldBe(200).Items());
+            var replies = await Task.WhenAll(Enumerable.Range(0, 30).Select(_ => Add(user, bookId)));
+
+            Assert.Equal(1, replies.Count(r => r.Code == 201));
+            Assert.All(replies.Where(r => r.Code != 201), r => Assert.Equal(409, r.Code));
+        }
+
+        Assert.Equal(5, (await Api.Get("api/me/books", user.Token)).ShouldBe(200).Items().Count);
     }
 }

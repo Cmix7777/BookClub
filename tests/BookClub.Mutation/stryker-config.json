@@ -13,7 +13,7 @@
       "html"
     ],
     "coverage-analysis": "perTest",
-    "concurrency": 2,
+    "concurrency": 1,
     "thresholds": {
       "high": 90,
       "low": 70,
