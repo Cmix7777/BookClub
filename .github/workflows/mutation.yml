@@ -1,0 +1,154 @@
+name: Mutation
+
+# Проверка самих тестов: Stryker портит код сайта (меняет «больше» на «больше или равно», убирает проверки,
+# переворачивает условия) и смотрит, заметят ли это тесты. Заметили: мутант «убит». Не заметили:
+# мутант «выжил», и это место, где тесты слабее, чем казалось.
+# Запуск вручную кнопкой Run workflow (можно указать, какие файлы портить) и при изменении самой проверки.
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Какие файлы портить (маска Stryker)'
+        default: '**/Controllers/VotesController.cs'
+  push:
+    branches: [master, main]
+    paths:
+      - 'tests/BookClub.Mutation/**'
+      - 'tests/mutation-report.py'
+      - '.github/workflows/mutation.yml'
+
+permissions:
+  contents: write   # нужно только чтобы выложить короткий итог в ветку ci-status-mutation
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bookclub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      # настройки сайта: он запускается внутри тестового процесса и читает их из окружения
+      ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=bookclub_test;Username=postgres;Password=postgres
+      Jwt__Key: ci-only-signing-key-for-tests-0123456789-abcdefghijklmnop
+      # настройки тестов
+      BOOKCLUB_TEST_DB: Host=127.0.0.1;Port=5432;Database=bookclub_test;Username=postgres;Password=postgres
+      BOOKCLUB_TEST_JWT_KEY: ci-only-signing-key-for-tests-0123456789-abcdefghijklmnop
+      MUTATE: ${{ inputs.files || '**/Controllers/VotesController.cs' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Prepare log folder
+        run: mkdir -p logs
+
+      - name: Build the site
+        id: build
+        run: dotnet build BookClub.csproj -c Release 2>&1 | tee logs/build.log
+
+      - name: Create database tables (EF migrations)
+        id: migrate
+        run: |
+          {
+            dotnet tool install --global dotnet-ef --version 10.0.12
+            export PATH="$PATH:$HOME/.dotnet/tools"
+            dotnet ef database update --no-build --configuration Release
+          } 2>&1 | tee logs/migrate.log
+
+      # Сначала обычный прогон тестов двойника: Stryker имеет смысл запускать только на зелёных тестах.
+      - name: Tests with the site inside the test process
+        id: twin
+        continue-on-error: true
+        run: >
+          dotnet test tests/BookClub.Mutation -c Release
+          --logger "trx;LogFileName=twin.trx" --results-directory test-results 2>&1 | tee logs/twin.log
+
+      - name: Install Stryker
+        id: install
+        if: steps.twin.outcome == 'success'
+        run: dotnet tool install --global dotnet-stryker --version 5.0.0 2>&1 | tee logs/install.log
+
+      - name: Mutation testing
+        id: stryker
+        if: steps.twin.outcome == 'success'
+        continue-on-error: true
+        working-directory: tests/BookClub.Mutation
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet stryker --mutate "$MUTATE" 2>&1 | tee "$GITHUB_WORKSPACE/logs/stryker.log"
+
+      - name: Mutation report
+        if: always()
+        run: python3 tests/mutation-report.py tests/BookClub.Mutation/StrykerOutput >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: |
+            tests/BookClub.Mutation/StrykerOutput/**/reports
+            test-results
+            logs
+          if-no-files-found: ignore
+
+      - name: Publish a short summary to branch ci-status-mutation
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/status"
+          {
+            echo "run=${GITHUB_RUN_NUMBER}"
+            echo "sha=${GITHUB_SHA}"
+            echo "result=${RESULT}"
+            echo "mutate=${MUTATE}"
+            echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "cpus=$(nproc) memory_mb=$(free -m | awk '/Mem:/ {print $2}')"
+            echo "--- steps ---"
+            python3 -c 'import json,os; d=json.loads(os.environ["STEPS_JSON"]); [print(k+": "+str(v.get("outcome"))) for k,v in d.items()]'
+            for n in build migrate install; do
+              if [ -f "logs/$n.log" ]; then echo "--- $n (tail) ---"; tail -n 15 "logs/$n.log"; fi
+            done
+            if [ -f logs/twin.log ]; then
+              echo "--- twin tests (tail) ---"; tail -n 25 logs/twin.log
+              echo "--- twin tests (errors) ---"; grep -E "Failed |Error Message|Assert|Expected|Actual|Exception|error " logs/twin.log | head -n 60
+            fi
+            if [ -f logs/stryker.log ]; then echo "--- stryker (tail) ---"; tail -n 70 logs/stryker.log; fi
+            echo "--- report ---"
+            python3 tests/mutation-report.py tests/BookClub.Mutation/StrykerOutput 80 2>&1
+          } > "$RUNNER_TEMP/status/status-mutation.txt"
+          cd "$RUNNER_TEMP/status"
+          git init -q
+          git checkout -q -b ci-status-mutation
+          git add status-mutation.txt
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Мутации ${GITHUB_RUN_NUMBER}: ${RESULT}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-status-mutation
+
+      - name: Fail the run if the twin tests or Stryker failed
+        if: steps.twin.outcome == 'failure' || steps.stryker.outcome == 'failure'
+        run: exit 1

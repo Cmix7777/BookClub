@@ -488,3 +488,7 @@ artifacts/
 site.log
 
 logs/
+
+# Нагрузка и мутации
+StrykerOutput/
+load-summary.json
