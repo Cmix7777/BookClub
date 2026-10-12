@@ -251,17 +251,22 @@ public class ReviewsTests
         Assert.Equal(author.Username, signed.Str("author"));
     }
 
-    [Fact(DisplayName = "Пятнадцать одновременных рецензий одного человека на одну книгу: рецензия одна, ни одной ошибки сервера")]
+    [Fact(DisplayName = "Двадцать одновременных рецензий одного человека на одну книгу, пять раз подряд: рецензия одна, ни одной ошибки сервера")]
     public async Task Parallel_reviews_of_one_user_keep_a_single_review()
     {
         var user = await TestUser.Create();
-        var bookId = await Make.Book(user);
 
-        var replies = await Task.WhenAll(Enumerable.Range(0, 15).Select(i => Write(user, bookId, 1 + i % 5)));
+        // гонка случается не при каждой попытке, поэтому бросаем пять пачек запросов, каждая про новую книгу
+        for (var round = 0; round < 5; round++)
+        {
+            var bookId = await Make.Book(user);
 
-        Assert.Equal(1, replies.Count(r => r.Code == 201));
-        // остальные либо обновили готовую рецензию (200), либо проиграли гонку и просят повторить (409)
-        Assert.All(replies.Where(r => r.Code != 201), r => Assert.Contains(r.Code, new[] { 200, 409 }));
-        Assert.Equal(1, (await Api.Get($"api/books/{bookId}/reviews")).ShouldBe(200).Int("count"));
+            var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(i => Write(user, bookId, 1 + i % 5)));
+
+            Assert.Equal(1, replies.Count(r => r.Code == 201));
+            // остальные либо обновили готовую рецензию (200), либо проиграли гонку и просят повторить (409)
+            Assert.All(replies.Where(r => r.Code != 201), r => Assert.Contains(r.Code, new[] { 200, 409 }));
+            Assert.Equal(1, (await Api.Get($"api/books/{bookId}/reviews")).ShouldBe(200).Int("count"));
+        }
     }
 }

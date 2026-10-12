@@ -78,20 +78,28 @@ public class VotingTests
         (await Vote(guest, secondPoll, 0)).ShouldBe(409);
     }
 
-    [Fact(DisplayName = "Двадцать одновременных голосов одного человека: засчитан ровно один, остальные 409, ни одной ошибки сервера")]
+    [Fact(DisplayName = "Тридцать одновременных голосов одного человека, пять раз подряд: засчитан один за раз, остальные 409, ни одной ошибки сервера")]
     public async Task Parallel_votes_of_one_user_count_once()
     {
         var owner = await TestUser.Create();
-        var poll = await Make.Poll(owner, await Make.Club(owner));
+        var clubId = await Make.Club(owner);
+        var poll = await Make.Poll(owner, clubId);
 
-        var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Vote(owner, poll, 0)));
+        // гонка случается не при каждой попытке, поэтому бросаем пять пачек запросов, каждая от нового человека
+        for (var round = 0; round < 5; round++)
+        {
+            var voter = await TestUser.Create();
+            await Make.Join(voter, clubId);
 
-        Assert.Equal(1, replies.Count(r => r.Code == 200));
-        Assert.All(replies.Where(r => r.Code != 200), r => Assert.Equal(409, r.Code));
+            var replies = await Task.WhenAll(Enumerable.Range(0, 30).Select(_ => Vote(voter, poll, 0)));
 
-        Assert.Equal(1, (await Api.Get("api/polls/" + poll.Id, owner.Token)).ShouldBe(200).Int("votersCount"));
+            Assert.Equal(1, replies.Count(r => r.Code == 200));
+            Assert.All(replies.Where(r => r.Code != 200), r => Assert.Equal(409, r.Code));
+        }
+
+        Assert.Equal(5, (await Api.Get("api/polls/" + poll.Id, owner.Token)).ShouldBe(200).Int("votersCount"));
         await Make.Close(owner, poll);
-        Assert.Equal(1, (await Results(owner, poll)).ShouldBe(200).Int("totalVotes"));
+        Assert.Equal(5, (await Results(owner, poll)).ShouldBe(200).Int("totalVotes"));
     }
 
     [Fact(DisplayName = "Не участник клуба голосовать не может: 403")]
