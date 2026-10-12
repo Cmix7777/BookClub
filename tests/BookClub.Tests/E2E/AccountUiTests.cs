@@ -152,13 +152,14 @@ public class AccountUiTests(BrowserFixture browser)
 
         await visit.Check(async page =>
         {
-            await Expect(page.Locator("#who .uname")).ToHaveTextAsync("ghost");
-
-            await visit.Go("profile");
-
-            await Expect(page.Locator("#page-auth")).ToHaveClassAsync(new Regex("active"));
-            await Expect(page.Locator("#toast")).ToContainTextAsync("Сессия завершена");
+            // сайт сам замечает, что токен не годится (сервер ответил 401), и выводит человека из аккаунта
             await Expect(page.Locator("#who")).ToContainTextAsync("Войти");
+            await Expect(page.Locator("#who .uname")).ToHaveCountAsync(0);
+            await Expect(page.Locator("#toast")).ToContainTextAsync("Сессия завершена");
+
+            // и в закрытый раздел после этого не пускает: вместо профиля открывается вход
+            await visit.Go("profile");
+            await Expect(page.Locator("#page-auth")).ToHaveClassAsync(new Regex("active"));
         });
     }
 

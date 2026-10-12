@@ -122,19 +122,19 @@ public class ClubUiTests(BrowserFixture browser)
             await page.Locator("#mOk").ClickAsync();
 
             await Expect(page.Locator("#toast")).ToContainTextAsync("Отбор создан");
-            await Expect(page.Locator(".env-q")).ToHaveTextAsync(question);
-            await Expect(page.Locator(".eopt")).ToHaveCountAsync(2);
+            await Expect(page.Locator("#page-club .env-q")).ToHaveTextAsync(question);
+            await Expect(page.Locator("#page-club .eopt")).ToHaveCountAsync(2);
             await Expect(page.Locator("#clock")).ToBeVisibleAsync();
 
             // 2. голосуем за «победителя»
-            await page.Locator(".eopt", new PageLocatorOptions { HasText = winner }).ClickAsync();
+            await page.Locator("#page-club .eopt", new PageLocatorOptions { HasText = winner }).ClickAsync();
             await page.Locator("#envVote").ClickAsync();
             await Expect(page.Locator("#toast")).ToContainTextAsync("Голос принят");
-            await Expect(page.Locator(".waitbox")).ToContainTextAsync("Ваш голос запечатан");
-            await Expect(page.Locator(".count-big")).ToHaveTextAsync("1");
+            await Expect(page.Locator("#page-club .waitbox")).ToContainTextAsync("Ваш голос запечатан");
+            await Expect(page.Locator("#page-club .count-big")).ToHaveTextAsync("1");
 
             // 3. пока конверт запечатан, процентов нет
-            foreach (var option in await page.Locator(".eopt").AllAsync())
+            foreach (var option in await page.Locator("#page-club .eopt").AllAsync())
                 await Expect(option).ToHaveAttributeAsync("data-pct", "0");
         });
 
@@ -151,13 +151,13 @@ public class ClubUiTests(BrowserFixture browser)
             await page.ReloadAsync();
             await visit.Go("clubs");
             await page.Locator(".club", new PageLocatorOptions { HasText = clubName }).ClickAsync();
-            await Expect(page.Locator(".count-big")).ToHaveTextAsync("2");
+            await Expect(page.Locator("#page-club .count-big")).ToHaveTextAsync("2");
             await page.Locator("#envClose").ClickAsync();
 
-            await Expect(page.Locator(".winline")).ToContainTextAsync("Клуб выбрал " + winner);
-            await Expect(page.Locator(".winline")).ToContainTextAsync("всего голосов: 2");
-            await Expect(page.Locator(".eopt[data-win='1']")).ToHaveCountAsync(1);
-            await Expect(page.Locator(".eopt[data-win='1'] .pct")).ToHaveTextAsync("100%");
+            await Expect(page.Locator("#page-club .winline")).ToContainTextAsync("Клуб выбрал " + winner);
+            await Expect(page.Locator("#page-club .winline")).ToContainTextAsync("всего голосов: 2");
+            await Expect(page.Locator("#page-club .eopt[data-win='1']")).ToHaveCountAsync(1);
+            await Expect(page.Locator("#page-club .eopt[data-win='1'] .pct")).ToHaveTextAsync("100%");
             await Expect(page.Locator("#envVote")).ToHaveCountAsync(0);
         });
     }

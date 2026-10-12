@@ -30,7 +30,7 @@ public class ClubsTests
         Assert.Equal(1, created.Int("membersCount"));
         Assert.False(created.Bool("hasActivePoll"));
 
-        var members = (await Api.Get($"api/clubs/{created.GuidOf("id")}/members")).ShouldBe(200).Items();
+        var members = (await Api.Get($"api/clubs/{created.GuidOf("id")}/members", owner.Token)).ShouldBe(200).Items();
         var only = Assert.Single(members);
         Assert.Equal(owner.Id, only.GetProperty("userId").GetGuid());
         Assert.Equal(owner.Username, only.GetProperty("username").GetString());
@@ -88,7 +88,7 @@ public class ClubsTests
         var club = (await Api.Get("api/clubs/" + clubId)).ShouldBe(200);
         Assert.Equal(2, club.Int("membersCount"));
 
-        var members = (await Api.Get($"api/clubs/{clubId}/members")).ShouldBe(200).Items();
+        var members = (await Api.Get($"api/clubs/{clubId}/members", owner.Token)).ShouldBe(200).Items();
         var joined = members.Single(m => m.GetProperty("userId").GetGuid() == guest.Id);
         Assert.Equal("Member", joined.GetProperty("role").GetString());
     }
@@ -98,7 +98,7 @@ public class ClubsTests
     {
         var (clubId, owner, others) = await Make.ClubWithMembers(2);
 
-        var members = (await Api.Get($"api/clubs/{clubId}/members")).ShouldBe(200).Items();
+        var members = (await Api.Get($"api/clubs/{clubId}/members", owner.Token)).ShouldBe(200).Items();
         var ids = members.Select(m => m.GetProperty("userId").GetGuid()).ToList();
 
         Assert.Equal(new[] { owner.Id, others[0].Id, others[1].Id }, ids);
