@@ -3,30 +3,45 @@ name: Mutation
 # Проверка самих тестов: Stryker портит код сайта (меняет «больше» на «больше или равно», убирает проверки,
 # переворачивает условия) и смотрит, заметят ли это тесты. Заметили: мутант «убит». Не заметили:
 # мутант «выжил», и это место, где тесты слабее, чем казалось.
-# Запуск вручную кнопкой Run workflow (можно указать, какие файлы портить) и при изменении самой проверки.
+#
+# Каждый файл сайта проверяется отдельным заданием, все задания идут параллельно, а в конце одно общее
+# задание собирает итог. Запуск вручную (Actions, Mutation, Run workflow), при изменении самой проверки
+# и при изменении API-тестов.
 on:
   workflow_dispatch:
-    inputs:
-      files:
-        description: 'Какие файлы портить (маска Stryker)'
-        default: '**/Controllers/VotesController.cs'
   push:
     branches: [master, main]
     paths:
       - 'tests/BookClub.Mutation/**'
+      - 'tests/BookClub.Tests/Api/**'
+      - 'tests/BookClub.Tests/Support/**'
       - 'tests/mutation-report.py'
       - '.github/workflows/mutation.yml'
 
-permissions:
-  contents: write   # нужно только чтобы выложить короткий итог в ветку ci-status-mutation
-
 jobs:
   mutation:
+    name: mutation (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Admin,    files: '**/Controllers/AdminController.cs' }
+          - { name: Auth,     files: '**/Controllers/AuthController.cs' }
+          - { name: Books,    files: '**/Controllers/BooksController.cs' }
+          - { name: Clubs,    files: '**/Controllers/ClubsController.cs' }
+          - { name: Polls,    files: '**/Controllers/PollsController.cs' }
+          - { name: Reviews,  files: '**/Controllers/ReviewsController.cs' }
+          - { name: Shelf,    files: '**/Controllers/ShelfController.cs' }
+          - { name: Users,    files: '**/Controllers/UsersController.cs' }
+          - { name: Votes,    files: '**/Controllers/VotesController.cs' }
+          - { name: Services, files: '**/Services/*.cs' }
+          - { name: Program,  files: '**/Program.cs' }
 
     services:
       postgres:
@@ -51,7 +66,7 @@ jobs:
       # настройки тестов
       BOOKCLUB_TEST_DB: Host=127.0.0.1;Port=5432;Database=bookclub_test;Username=postgres;Password=postgres
       BOOKCLUB_TEST_JWT_KEY: ci-only-signing-key-for-tests-0123456789-abcdefghijklmnop
-      MUTATE: ${{ inputs.files || '**/Controllers/VotesController.cs' }}
+      MUTATE: ${{ matrix.files }}
 
     steps:
       - uses: actions/checkout@v4
@@ -98,49 +113,79 @@ jobs:
           export PATH="$PATH:$HOME/.dotnet/tools"
           dotnet stryker --mutate "$MUTATE" 2>&1 | tee "$GITHUB_WORKSPACE/logs/stryker.log"
 
-      - name: Mutation report
+      - name: Short note about this job
         if: always()
-        run: python3 tests/mutation-report.py tests/BookClub.Mutation/StrykerOutput >> "$GITHUB_STEP_SUMMARY"
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          set +e
+          mkdir -p part
+          strip() { sed 's/\x1b\[[0-9;]*m//g'; }
+          {
+            echo "### ${{ matrix.name }}  (маска: ${{ matrix.files }})"
+            python3 -c 'import json,os; d=json.loads(os.environ["STEPS_JSON"]); [print(k+": "+str(v.get("outcome"))) for k,v in d.items() if k in ("build","migrate","twin","install","stryker")]'
+            if [ -f logs/twin.log ]; then
+              grep -E "Passed!|Failed!" logs/twin.log | tail -n 1 | strip
+              grep -E "Failed |Error Message|Assert|Expected|Actual|Exception" logs/twin.log | head -n 20 | strip
+            fi
+            if [ -f logs/stryker.log ]; then
+              grep -E "Time Elapsed|final mutation score" logs/stryker.log | strip
+              grep -E "ERR|Fail|rror" logs/stryker.log | head -n 12 | strip
+            fi
+            if [ "${{ steps.twin.outcome }}" != "success" ] || [ "${{ steps.stryker.outcome }}" = "failure" ]; then
+              echo "--- tail of logs ---"
+              tail -n 30 logs/twin.log 2>/dev/null | strip
+              tail -n 40 logs/stryker.log 2>/dev/null | strip
+            fi
+            echo
+          } > part/part.txt
 
       - name: Save results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mutation-results
+          name: mutation-${{ matrix.name }}
           path: |
+            part/part.txt
             tests/BookClub.Mutation/StrykerOutput/**/reports
-            test-results
-            logs
           if-no-files-found: ignore
 
-      - name: Publish a short summary to branch ci-status-mutation
-        if: always()
+      - name: Fail the job if the twin tests or Stryker failed
+        if: steps.twin.outcome == 'failure' || steps.stryker.outcome == 'failure'
+        run: exit 1
+
+  summary:
+    name: summary
+    needs: mutation
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # нужно только чтобы выложить короткий итог в ветку ci-status-mutation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutation-*
+          path: all
+
+      - name: Build the summary and publish it to branch ci-status-mutation
         env:
           GH_TOKEN: ${{ github.token }}
-          RESULT: ${{ job.status }}
-          STEPS_JSON: ${{ toJSON(steps) }}
+          RESULT: ${{ needs.mutation.result }}
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/status"
+          python3 tests/mutation-report.py all 200 >> "$GITHUB_STEP_SUMMARY"
           {
             echo "run=${GITHUB_RUN_NUMBER}"
             echo "sha=${GITHUB_SHA}"
             echo "result=${RESULT}"
-            echo "mutate=${MUTATE}"
             echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "cpus=$(nproc) memory_mb=$(free -m | awk '/Mem:/ {print $2}')"
-            echo "--- steps ---"
-            python3 -c 'import json,os; d=json.loads(os.environ["STEPS_JSON"]); [print(k+": "+str(v.get("outcome"))) for k,v in d.items()]'
-            for n in build migrate install; do
-              if [ -f "logs/$n.log" ]; then echo "--- $n (tail) ---"; tail -n 15 "logs/$n.log"; fi
-            done
-            if [ -f logs/twin.log ]; then
-              echo "--- twin tests (tail) ---"; tail -n 25 logs/twin.log
-              echo "--- twin tests (errors) ---"; grep -E "Failed |Error Message|Assert|Expected|Actual|Exception|error " logs/twin.log | head -n 60
-            fi
-            if [ -f logs/stryker.log ]; then echo "--- stryker (tail) ---"; tail -n 70 logs/stryker.log; fi
+            echo "--- jobs ---"
+            for f in all/*/part.txt; do [ -f "$f" ] && cat "$f"; done
             echo "--- report ---"
-            python3 tests/mutation-report.py tests/BookClub.Mutation/StrykerOutput 80 2>&1
+            python3 tests/mutation-report.py all 200 2>&1
           } > "$RUNNER_TEMP/status/status-mutation.txt"
           cd "$RUNNER_TEMP/status"
           git init -q
@@ -149,6 +194,6 @@ jobs:
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Мутации ${GITHUB_RUN_NUMBER}: ${RESULT}"
           git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-status-mutation
 
-      - name: Fail the run if the twin tests or Stryker failed
-        if: steps.twin.outcome == 'failure' || steps.stryker.outcome == 'failure'
+      - name: Fail if any job failed
+        if: needs.mutation.result != 'success'
         run: exit 1
