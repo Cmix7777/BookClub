@@ -53,6 +53,31 @@ public class VotingTests
         Assert.Equal(1, state.Int("votersCount"));
     }
 
+    [Fact(DisplayName = "Один человек голосует в двух разных отборах: «уже голосовал» считается отдельно по каждому отбору")]
+    public async Task Same_user_can_vote_in_two_different_polls()
+    {
+        var firstOwner = await TestUser.Create();
+        var firstClub = await Make.Club(firstOwner);
+        var firstPoll = await Make.Poll(firstOwner, firstClub);
+
+        var secondOwner = await TestUser.Create();
+        var secondClub = await Make.Club(secondOwner);
+        var secondPoll = await Make.Poll(secondOwner, secondClub);
+
+        var guest = await TestUser.Create();
+        await Make.Join(guest, firstClub);
+        await Make.Join(guest, secondClub);
+
+        (await Vote(guest, firstPoll, 0)).ShouldBe(200);
+        (await Vote(guest, secondPoll, 1)).ShouldBe(200);
+
+        // каждый голос лёг в свой отбор, а повторный голос в любом из них по-прежнему отклоняется
+        Assert.Equal(1, (await Api.Get("api/polls/" + firstPoll.Id, guest.Token)).ShouldBe(200).Int("votersCount"));
+        Assert.Equal(1, (await Api.Get("api/polls/" + secondPoll.Id, guest.Token)).ShouldBe(200).Int("votersCount"));
+        (await Vote(guest, firstPoll, 1)).ShouldBe(409);
+        (await Vote(guest, secondPoll, 0)).ShouldBe(409);
+    }
+
     [Fact(DisplayName = "Пять одновременных голосов одного человека: засчитан ровно один, остальные 409, ни одной ошибки сервера")]
     public async Task Parallel_votes_of_one_user_count_once()
     {

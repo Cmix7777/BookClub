@@ -12,8 +12,11 @@ export const PASSWORD = 'Passw0rd!test';
 
 // Уникальная метка: номер виртуального пользователя, номер его круга и случайный хвост.
 // Логин сайта допускает латиницу, цифры, точку и подчёркивание и не длиннее 30 знаков.
+// В подготовительном шаге setup() номера __ITER у k6 нет, поэтому подстраховываемся.
 function unique(prefix) {
-  return prefix + __VU + 'x' + __ITER + 'x' + Math.random().toString(36).slice(2, 8);
+  const vu = typeof __VU === 'undefined' ? 0 : __VU;
+  const iter = typeof __ITER === 'undefined' ? 0 : __ITER;
+  return prefix + vu + 'x' + iter + 'x' + Math.random().toString(36).slice(2, 8);
 }
 
 // Параметры запроса. Тег name нужен, чтобы k6 считал время отдельно по каждому ВИДУ запроса
