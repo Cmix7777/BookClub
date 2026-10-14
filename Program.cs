@@ -83,6 +83,28 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// На хостинге таблицы создаются сами при запуске (там нет dotnet ef).
+// Локально по-прежнему dotnet ef database update, настройка по умолчанию выключена.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+
+    // Первого админа через API не завести, поэтому его логин можно указать в настройках хостинга.
+    // Роль выдаётся при запуске, если такой пользователь уже зарегистрирован.
+    var adminName = app.Configuration["Admin:Username"];
+    if (!string.IsNullOrWhiteSpace(adminName))
+    {
+        var admin = db.Users.FirstOrDefault(u => u.Username == adminName);
+        if (admin is not null && admin.Role != "Admin")
+        {
+            admin.Role = "Admin";
+            db.SaveChanges();
+        }
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
