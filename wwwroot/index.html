@@ -87,7 +87,7 @@ nav{display:flex;gap:var(--s3)}
 /* печать — отдельный элемент, центр точно на острие клапана (y = 92px) */
 .seal{position:absolute;left:50%;top:64px;width:56px;height:56px;margin-left:-28px;z-index:4;transition:transform .8s cubic-bezier(.5,-.4,.3,1.4),opacity .6s}
 .opened .seal{transform:scale(.55) translateY(-26px) rotate(-22deg);opacity:0}
-.env-body{padding:14px 30px 30px;position:relative}
+.env-body{padding:34px 30px 30px;position:relative} /* печать заканчивается на 120px, строка с названием клуба начинается ниже неё */
 .env-top{display:flex;justify-content:space-between;font-size:var(--t-xs);opacity:.78;margin-bottom:var(--s3);gap:12px;flex-wrap:wrap}
 .env-q{font-family:'Fraunces',serif;font-size:var(--t-xl);text-align:center;margin-bottom:6px}
 .env-sub{text-align:center;font-size:var(--t-xs);opacity:.72;margin-bottom:var(--s3)}
@@ -744,7 +744,7 @@ function envelopeHTML(poll, results, opts = {}) {
     '<div class="env-flap">' +
       '<svg class="flap-shape" viewBox="0 0 600 96" preserveAspectRatio="none">' +
         '<path d="M0 0 L600 0 L600 8 L300 92 L0 8 Z" fill="#2A4B36"/>' +
-        '<path d="M0 8 L300 92 L600 8" fill="none" stroke="rgba(244,241,233,.16)" stroke-width="1.2"/>' +
+        '<path d="M0 8 L300 92 L600 8" fill="none" stroke="rgba(244,241,233,.16)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>' +
       '</svg>' +
     '</div>' +
     '<svg class="seal" viewBox="0 0 56 56">' +
