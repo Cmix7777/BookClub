@@ -91,6 +91,19 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
+    // Демо-данные для показа: читатели, клубы, голосования, рецензии.
+    // Загружаются один раз — только если включена настройка и в базе ещё нет ни одной книги.
+    if (app.Configuration.GetValue<bool>("Database:SeedDemo") && !db.Books.Any())
+    {
+        var seedPath = Path.Combine(AppContext.BaseDirectory, "Data", "demo-seed.sql");
+        if (File.Exists(seedPath))
+        {
+            using var tx = db.Database.BeginTransaction();
+            db.Database.ExecuteSqlRaw(File.ReadAllText(seedPath));
+            tx.Commit();
+        }
+    }
+
     // Первого админа через API не завести, поэтому его логин можно указать в настройках хостинга.
     // Роль выдаётся при запуске, если такой пользователь уже зарегистрирован.
     var adminName = app.Configuration["Admin:Username"];

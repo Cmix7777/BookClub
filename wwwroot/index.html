@@ -336,6 +336,19 @@ table.adm{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
 .pchip button:hover{background:rgba(255,255,255,.3)}
 .pick-list label.dis{opacity:.4}
 .pick-more{font-size:var(--t-xs);color:var(--soft);padding:10px 0}
+
+/* ---------- телефоны ---------- */
+@media(max-width:920px){
+  .feature-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .wrap{padding:0 16px}
+  /* шапка в две строки: логотип и вход сверху, разделы снизу */
+  header .wrap{height:auto;flex-wrap:wrap;padding-top:10px;row-gap:2px}
+  header nav{order:3;width:100%;justify-content:space-between;gap:10px;overflow-x:auto}
+  .nav-btn{padding:9px 0;white-space:nowrap}
+  .feature-grid,.admin-stats{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>

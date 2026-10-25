@@ -20,4 +20,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- скрипт демо-данных копируется рядом с dll, чтобы сервер мог его прочитать -->
+    <None Update="Data/demo-seed.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
