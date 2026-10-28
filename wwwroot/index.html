@@ -320,6 +320,18 @@ table.adm{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
 .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:100px;border:1px solid var(--line);color:var(--soft)}
 .pill.admin{color:var(--forest);border-color:rgba(30,58,44,.4)}
 .pill.blocked{color:var(--danger);border-color:rgba(179,64,46,.4)}
+.adm-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+.adm-tools input,.adm-tools select{border:1px solid var(--line2);border-radius:3px;background:var(--paper);padding:9px 12px;font-size:var(--t-sm);color:var(--ink)}
+.adm-tools input{flex:1 1 240px;min-width:0}
+.adm-tools .chips{display:flex;flex-wrap:wrap;gap:6px}
+.adm-user{font-weight:500}
+.adm-mail{font-size:var(--t-xs);color:var(--soft);margin-top:2px}
+.acts-col{flex-direction:column;align-items:stretch}
+.adm tr.flagged td{background:rgba(179,64,46,.05)}
+.flags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.rate.low{color:var(--danger);font-weight:600}
+.chip.warn:not(.on){border-color:rgba(179,64,46,.5);color:var(--danger)}
+.adm-more{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-14px 0 var(--s5);font-size:var(--t-sm)}
 .acts{display:flex;gap:6px}
 .dup{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:var(--s3);margin-bottom:12px}
 .dup .ids{display:flex;flex-direction:column;gap:8px;margin-top:12px}
@@ -1471,7 +1483,7 @@ async function renderAdmin() {
   const [st, us, rv, dup] = await Promise.all([
     api('GET', '/api/admin/stats'),
     api('GET', '/api/admin/users'),
-    api('GET', '/api/admin/reviews?take=50'),
+    api('GET', '/api/admin/reviews?take=200'),
     api('GET', '/api/admin/books/duplicates')
   ]);
   if (!st.ok) { body.innerHTML = '<div class="empty">' + esc(st.error) + '</div>'; return; }
@@ -1489,12 +1501,160 @@ async function renderAdmin() {
     '</div>' +
 
     '<div class="section-t">Пользователи</div>' +
+    '<div class="adm-tools">' +
+      '<input id="admSearch" type="search" placeholder="Поиск по логину или почте" value="' + esc(admState.q) + '">' +
+      '<div class="chips">' +
+        [['all', 'Все'], ['admins', 'Администраторы'], ['blocked', 'Заблокированные']].map(([k, t]) =>
+          '<button class="chip' + (admState.filter === k ? ' on' : '') + '" data-admfilter="' + k + '">' + t + '</button>').join('') +
+      '</div>' +
+      '<select id="admSort">' +
+        [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['active', 'Самые активные']].map(([k, t]) =>
+          '<option value="' + k + '"' + (admState.sort === k ? ' selected' : '') + '>' + t + '</option>').join('') +
+      '</select>' +
+    '</div>' +
+    '<div id="admUsers"></div>' +
+
+    '<div class="section-t">Рецензии</div>' +
+    '<div id="admRevTools"></div>' +
+    '<div id="admReviews"></div>' +
+
+    '<div class="section-t">Дубликаты книг</div>' +
+    (dup.ok && dup.data.length
+      ? dup.data.map(g => '<div class="dup"><b>' + esc(g.title) + '</b> <span class="muted">· ' + esc(g.author) + ' · ' + g.bookIds.length + ' копии</span>' +
+          '<div class="ids">' + g.bookIds.map(id => '<div class="idrow"><span>' + id + '</span>' +
+            '<button class="btn btn-danger btn-sm" data-delbook="' + id + '">Удалить эту копию</button></div>').join('') + '</div></div>').join('')
+      : '<div class="empty">Дубликатов не найдено</div>');
+
+  admUsers = us.ok ? us.data : [];
+  admReviews = rv.ok ? rv.data : [];
+  renderAdminUsers();
+  renderAdminReviews();
+}
+
+// ---------- модерация рецензий ----------
+// Подозрительные признаки ищем прямо в браузере: это подсказка админу, а не автоматический бан.
+const REVIEW_STOP = ['казино', 'заработ', 'реклам', 'подпишись', 'промокод', 'скидк', 'дурак', 'идиот', 'тупой', 'тупая', 'бред'];
+function reviewFlags(r) {
+  const t = (r.text || '').trim();
+  const f = [];
+  if (/(https?:\/\/|www\.|t\.me\/|\b\w+\.(ru|com|net|org)\b)/i.test(t)) f.push('ссылка');
+  const letters = t.replace(/[^A-Za-zА-Яа-яЁё]/g, '');
+  if (letters.length >= 10 && letters.replace(/[^A-ZА-ЯЁ]/g, '').length / letters.length > 0.6) f.push('капс');
+  if (/(.)\1{4,}/.test(t)) f.push('повторы');
+  if (t.length < 15) f.push('слишком коротко');
+  const low = t.toLowerCase();
+  if (REVIEW_STOP.some(w => low.includes(w))) f.push('стоп-слово');
+  return f;
+}
+
+let admReviews = [];
+const revState = { q: '', filter: 'all', sort: 'new', shown: 10 };
+
+function renderAdminReviews() {
+  const tools = $('#admRevTools'), box = $('#admReviews');
+  if (!tools || !box) return;
+  const meId = session.user.id;
+  const flagged = admReviews.filter(r => reviewFlags(r).length).length;
+
+  if (!tools.dataset.ready) {
+    tools.dataset.ready = '1';
+    tools.innerHTML = '<div class="adm-tools">' +
+      '<input id="revSearch" type="search" placeholder="Поиск по книге, автору или тексту" value="' + esc(revState.q) + '">' +
+      '<div class="chips" id="revChips"></div>' +
+      '<select id="revSort">' +
+        [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['low', 'Сначала низкие оценки']].map(([k, t]) =>
+          '<option value="' + k + '"' + (revState.sort === k ? ' selected' : '') + '>' + t + '</option>').join('') +
+      '</select></div>';
+  }
+  $('#revChips').innerHTML =
+    [['all', 'Все'], ['flagged', 'На проверку' + (flagged ? ' · ' + flagged : '')], ['low', 'Оценка 1–2'], ['anon', 'Анонимные']].map(([k, t]) =>
+      '<button class="chip' + (revState.filter === k ? ' on' : '') + (k === 'flagged' && flagged ? ' warn' : '') + '" data-revfilter="' + k + '">' + t + '</button>').join('');
+
+  const q = revState.q.trim().toLowerCase();
+  let list = admReviews.filter(r =>
+    (!q || [r.bookTitle, r.authorUsername, r.text].some(x => (x || '').toLowerCase().includes(q))) &&
+    (revState.filter === 'all' ||
+     (revState.filter === 'flagged' && reviewFlags(r).length) ||
+     (revState.filter === 'low' && r.rating <= 2) ||
+     (revState.filter === 'anon' && r.isAnonymous)));
+
+  const byDate = (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt);
+  if (revState.sort === 'new') list.sort((a, b) => byDate(b, a));
+  if (revState.sort === 'old') list.sort(byDate);
+  if (revState.sort === 'low') list.sort((a, b) => a.rating - b.rating || byDate(b, a));
+
+  if (!list.length) {
+    box.innerHTML = '<div class="empty" style="margin-bottom:var(--s5)">' +
+      (revState.filter === 'flagged' ? 'Подозрительных рецензий нет' : 'Ничего не нашлось') + '</div>';
+    return;
+  }
+  const page = list.slice(0, revState.shown);
+  const userById = Object.fromEntries(admUsers.map(u => [u.id, u]));
+
+  box.innerHTML =
     '<div class="table-wrap"><table class="adm"><thead><tr>' +
-      '<th>Логин</th><th>Email</th><th>Роль</th><th>Статус</th><th>Клубов</th><th>Рецензий</th><th>Регистрация</th><th></th>' +
-    '</tr></thead><tbody>' + (us.ok ? us.data.map(u => {
+      '<th>Книга</th><th>Автор</th><th>Оценка</th><th>Текст</th><th>Дата</th><th></th>' +
+    '</tr></thead><tbody>' + page.map(r => {
+      const flags = reviewFlags(r);
+      const author = userById[r.authorId];
+      const canBlock = author && !author.isBlocked && r.authorId !== meId;
+      return '<tr' + (flags.length ? ' class="flagged"' : '') + '>' +
+        '<td>' + esc(r.bookTitle) + '</td>' +
+        '<td>' + esc(r.authorUsername) + (r.isAnonymous ? '<div class="adm-mail">опубликовано анонимно</div>' : '') +
+          (author && author.isBlocked ? '<div class="adm-mail" style="color:var(--danger)">заблокирован</div>' : '') + '</td>' +
+        '<td><span class="rate' + (r.rating <= 2 ? ' low' : '') + '">' + r.rating + ' / 5</span></td>' +
+        '<td class="wrap">' + (flags.length ? '<div class="flags">' + flags.map(f => '<span class="pill blocked">' + f + '</span>').join('') + '</div>' : '') +
+          esc(r.text || '—') + '</td>' +
+        '<td>' + fmtDate(r.updatedAt) + '</td>' +
+        '<td><div class="acts acts-col">' +
+          '<button class="btn btn-danger btn-sm" data-delreview="' + r.id + '">Удалить</button>' +
+          (canBlock ? '<button class="btn btn-ghost btn-sm" data-block="' + r.authorId + '">Заблокировать автора</button>' : '') +
+        '</div></td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    '<div class="adm-more"><span class="muted">Показано ' + page.length + ' из ' + list.length + '</span>' +
+      (list.length > page.length ? '<button class="btn btn-ghost btn-sm" data-revmore="1">Показать ещё</button>' : '') +
+    '</div>';
+}
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'revSearch') { revState.q = e.target.value; revState.shown = ADM_PAGE; renderAdminReviews(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'revSort') { revState.sort = e.target.value; revState.shown = ADM_PAGE; renderAdminReviews(); }
+});
+
+// ---------- таблица пользователей: поиск, фильтр, сортировка, «показать ещё» ----------
+const ADM_PAGE = 10;
+let admUsers = [];
+const admState = { q: '', filter: 'all', sort: 'new', shown: ADM_PAGE };
+
+function renderAdminUsers() {
+  const box = $('#admUsers');
+  if (!box) return;
+  const meId = session.user.id;
+  const q = admState.q.trim().toLowerCase();
+
+  let list = admUsers.filter(u =>
+    (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) &&
+    (admState.filter === 'all' ||
+     (admState.filter === 'admins' && u.role === 'Admin') ||
+     (admState.filter === 'blocked' && u.isBlocked)));
+
+  const byDate = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
+  if (admState.sort === 'new') list.sort((a, b) => byDate(b, a));
+  if (admState.sort === 'old') list.sort(byDate);
+  if (admState.sort === 'active') list.sort((a, b) => (b.reviewsCount + b.clubsCount) - (a.reviewsCount + a.clubsCount));
+
+  const page = list.slice(0, admState.shown);
+  if (!list.length) { box.innerHTML = '<div class="empty" style="margin-bottom:var(--s5)">Никого не нашлось</div>'; return; }
+
+  box.innerHTML =
+    '<div class="table-wrap"><table class="adm"><thead><tr>' +
+      '<th>Пользователь</th><th>Роль</th><th>Статус</th><th>Клубов</th><th>Рецензий</th><th>Регистрация</th><th></th>' +
+    '</tr></thead><tbody>' + page.map(u => {
       const self = u.id === meId;
-      return '<tr><td>' + esc(u.username) + (self ? ' <span class="pill">вы</span>' : '') + '</td>' +
-        '<td>' + esc(u.email) + '</td>' +
+      return '<tr><td><div class="adm-user">' + esc(u.username) + (self ? ' <span class="pill">вы</span>' : '') + '</div>' +
+          '<div class="adm-mail">' + esc(u.email) + '</div></td>' +
         '<td><span class="pill' + (u.role === 'Admin' ? ' admin' : '') + '">' + (u.role === 'Admin' ? 'Админ' : 'Пользователь') + '</span></td>' +
         '<td>' + (u.isBlocked ? '<span class="pill blocked">заблокирован</span>' : '<span class="pill">активен</span>') + '</td>' +
         '<td>' + u.clubsCount + '</td><td>' + u.reviewsCount + '</td><td>' + fmtDate(u.createdAt) + '</td>' +
@@ -1505,30 +1665,32 @@ async function renderAdmin() {
           '<button class="btn btn-ghost btn-sm" data-role="' + u.id + '" data-to="' + (u.role === 'Admin' ? 'User' : 'Admin') + '">' +
             (u.role === 'Admin' ? 'Снять админа' : 'Сделать админом') + '</button>' +
         '</div>') + '</td></tr>';
-    }).join('') : '') + '</tbody></table></div>' +
-
-    '<div class="section-t">Последние рецензии</div>' +
-    (rv.ok && rv.data.length
-      ? '<div class="table-wrap"><table class="adm"><thead><tr><th>Книга</th><th>Автор</th><th>Оценка</th><th>Текст</th><th></th></tr></thead><tbody>' +
-        rv.data.map(r => '<tr><td>' + esc(r.bookTitle) + '</td>' +
-          '<td>' + esc(r.authorUsername) + (r.isAnonymous ? ' <span class="pill">анонимно</span>' : '') + '</td>' +
-          '<td>' + r.rating + ' / 5</td><td class="wrap">' + esc(r.text || '—') + '</td>' +
-          '<td><button class="btn btn-danger btn-sm" data-delreview="' + r.id + '">Удалить</button></td></tr>').join('') +
-        '</tbody></table></div>'
-      : '<div class="empty" style="margin-bottom:var(--s5)">Рецензий нет</div>') +
-
-    '<div class="section-t">Дубликаты книг</div>' +
-    (dup.ok && dup.data.length
-      ? dup.data.map(g => '<div class="dup"><b>' + esc(g.title) + '</b> <span class="muted">· ' + esc(g.author) + ' · ' + g.bookIds.length + ' копии</span>' +
-          '<div class="ids">' + g.bookIds.map(id => '<div class="idrow"><span>' + id + '</span>' +
-            '<button class="btn btn-danger btn-sm" data-delbook="' + id + '">Удалить эту копию</button></div>').join('') + '</div></div>').join('')
-      : '<div class="empty">Дубликатов не найдено</div>');
+    }).join('') + '</tbody></table></div>' +
+    '<div class="adm-more"><span class="muted">Показано ' + page.length + ' из ' + list.length + '</span>' +
+      (list.length > page.length ? '<button class="btn btn-ghost btn-sm" data-admmore="1">Показать ещё</button>' : '') +
+    '</div>';
 }
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'admSearch') { admState.q = e.target.value; admState.shown = ADM_PAGE; renderAdminUsers(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'admSort') { admState.sort = e.target.value; admState.shown = ADM_PAGE; renderAdminUsers(); }
+});
 
 document.addEventListener('click', async e => {
   if (current.page !== 'admin') return;
   const t = e.target;
   let r = null;
+
+  if (t.dataset.admfilter) {
+    admState.filter = t.dataset.admfilter; admState.shown = ADM_PAGE;
+    $$('[data-admfilter]').forEach(b => b.classList.toggle('on', b === t));
+    renderAdminUsers(); return;
+  }
+  if (t.dataset.admmore) { admState.shown += ADM_PAGE; renderAdminUsers(); return; }
+  if (t.dataset.revfilter) { revState.filter = t.dataset.revfilter; revState.shown = ADM_PAGE; renderAdminReviews(); return; }
+  if (t.dataset.revmore) { revState.shown += ADM_PAGE; renderAdminReviews(); return; }
 
   if (t.dataset.block) {
     if (!confirm('Заблокировать пользователя? Он будет немедленно выведен из аккаунта.')) return;
